@@ -7,8 +7,8 @@
 
 // Define which pins will be used.
 const int BUTTON_PIN = 2;
-const int RED_PIN = 7;
-const int WHITE_PIN = 8;
+const int RED_PIN = 5;
+const int WHITE_PIN = 6;
 
 // Used in the software debounce on a momentary switch, tweak as needed. 
 const int DEBOUNCE_LENGTH = 250;
@@ -17,6 +17,10 @@ volatile long oldTime;
 // Keeps tab on the mood/mode.
 volatile int isAngry;
 
+// Illumination levels for both LED's.
+volatile int redLevel;
+volatile int whiteLevel;
+
 void setup() {
 
   pinMode(BUTTON_PIN, INPUT);
@@ -24,8 +28,8 @@ void setup() {
   pinMode(WHITE_PIN, OUTPUT);
   
   // Default mood/mode is normal running.
-  digitalWrite(WHITE_PIN, HIGH);
-  digitalWrite(RED_PIN, LOW);
+  analogWrite(WHITE_PIN, 25);
+  analogWrite(RED_PIN, 0);
   isAngry = false;
 
   oldTime = 0;
@@ -46,19 +50,19 @@ void moodButtonISR() {
     // We know the button "was" pressed and ISR triggered but we want to ignore switch bounce.
     if(wasButtonPressed()) {
 
-    isAngry = !isAngry;
+      isAngry = !isAngry;
     
-    if(isAngry) {
+      if(isAngry) {
       
-      digitalWrite(RED_PIN, HIGH);
-      digitalWrite(WHITE_PIN, LOW);
+        analogWrite(RED_PIN, 100);
+        analogWrite(WHITE_PIN, 0);
     
-    } else {
+      } else {
       
-      digitalWrite(RED_PIN, LOW);
-      digitalWrite(WHITE_PIN, HIGH);
+        analogWrite(RED_PIN, 0);
+        analogWrite(WHITE_PIN, 25);
     
-    }
+      }
     
   }
   
