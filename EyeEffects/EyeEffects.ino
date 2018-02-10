@@ -12,10 +12,10 @@ const int WHITE_PIN = 8;
 
 // Used in the software debounce on a momentary switch, tweak as needed. 
 const int DEBOUNCE_LENGTH = 250;
-long oldTime;
+volatile long oldTime;
 
 // Keeps tab on the mood/mode.
-int isAngry;
+volatile int isAngry;
 
 void setup() {
 
@@ -29,13 +29,22 @@ void setup() {
   isAngry = false;
 
   oldTime = 0;
+  attachInterrupt(digitalPinToInterrupt(2), moodButtonISR, RISING);
 
 } // end setup
 
 
 void loop() {
 
-  if(wasButtonPressed()) {
+  // Main loop is empty.
+  
+} // end loop
+
+
+void moodButtonISR() {
+
+    // We know the button "was" pressed and ISR triggered but we want to ignore switch bounce.
+    if(wasButtonPressed()) {
 
     isAngry = !isAngry;
     
@@ -53,7 +62,7 @@ void loop() {
     
   }
   
-} // end loop
+} // end moodButtonISR
 
 
 boolean wasButtonPressed() {
