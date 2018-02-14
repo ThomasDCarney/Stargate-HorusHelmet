@@ -8,33 +8,32 @@
  * Debouncing is handled in software.
  */
 
-// Define which pins will be used.
+// Using Adafruit NeoPixels, Libraries provided by AdaFruit.
+#include <Adafruit_NeoPixel.h>
+
+// Define which pins are used.
 const int BUTTON_PIN = 2;
-const int RED_PIN = 5;
-const int WHITE_PIN = 6;
+const int DATA_PIN = 6; // Sends instructions to "Data In" on strip.
+const int NUM_PIXELS = 1; // number of pixels in the strip.
 
-// Used in the software debounce on a momentary switch, tweak as needed. 
-const int DEBOUNCE_LENGTH = 250;
-volatile long oldDebounceTime = 0;
+// For software debounce (momentary switch). 
+const int DEBOUNCE_LENGTH = 250; // Tweak for the specific switch used.
+volatile long oldDebounceTime = 0; // Keep volatile (modified by ISR)
 
-// Keeps tab on the mood/mode.
-volatile int isAngry = false;
+// Keeps track of mood/mode (angry or passive).
+volatile int isAngry = false; // Keep volatile (modified by ISR).
 
-// Illumination levels for both LED's.
-const int maxRedLevel = 175;
-const int minRedLevel = 40;
-int redPeriod = 15;
-volatile int redLevel = maxRedLevel;
+// Illumination values for individual colors, 0 = off, 255 = max.
+int red = 200;
+int green = 25;
+int blue = 0;
 
-const int maxWhiteLevel = 175;
-const int minWhiteLevel = 40;
-volatile int whiteLevel = maxWhiteLevel;
-int whitePeriod = 15;
-
-// Used by animation sequences.
-boolean dimming = true;
-long oldRedTime = 0;    // Not sure we need unique times for red and white
-long oldWhiteTime = 0;  // but doesn't hurt so keeping it.
+/* The NeoPixel Strip object is used to represent/control the pixels. 
+ * Parameter 1 = Number of pixels in the strip.
+ * Parameter 2 = Pin used for data input.
+ * Parameter 3 = Pixel type flags... see documentation!
+ */
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_PIXELS, DATA_PIN, NEO_GRB);
 
 
 /**
@@ -42,15 +41,13 @@ long oldWhiteTime = 0;  // but doesn't hurt so keeping it.
  */
 void setup() {
 
-  // Init the pins
+  // Init the button.
   pinMode(BUTTON_PIN, INPUT);
-  pinMode(RED_PIN, OUTPUT);
-  pinMode(WHITE_PIN, OUTPUT);
-  
-  // Default mood/mode is normal running.
-  analogWrite(WHITE_PIN, maxWhiteLevel);
-  analogWrite(RED_PIN, 0); // Is off to start.
   attachInterrupt(digitalPinToInterrupt(2), moodButtonISR, RISING);
+
+  // Init the pixel strip.
+  strip.begin();
+  strip.show(); // no values specified yet so inits all pixels to off.
 
 } // end setup
 
@@ -61,85 +58,34 @@ void setup() {
  */
 void loop() {
 
-  if(isAngry) {
-
-    changeRedLevel();
-    
-  } else {
-
-    changeWhiteLevel();
-    
-  }
+  updateColorValues();
+  strip.setPixelColor(0, red, green, blue);
+  strip.show();
+  delay(50);
   
 } // end loop
 
 
 /**
- * This method determines the animation used for the red, "angry" LED.
+ * This method determines the animation used for pixels in "angry" mode.
  */
-void changeRedLevel() {
+void updateColorValues() {
 
-  long currentTime = millis();
+  if(isAngry) {
 
-  // Change redPeriod to make the pulse faster/slower.
-  if(currentTime - oldRedTime > redPeriod) {
+    red = 200;
+    green = 25;
+    blue = 0;
+      
+  } else {
 
-    // This animation is a simple pulse that dims and brightens.
-    if(dimming) {
-
-      analogWrite(RED_PIN, --redLevel);
+    red = 100;
+    green = 100;
+    blue = 100;
     
-    }  else {
-
-      analogWrite(RED_PIN, ++redLevel);
-      
-    }
-
-    if(redLevel >= maxRedLevel || redLevel <= minRedLevel) {
-
-      dimming = !dimming;
-      
-    }
-
-    oldRedTime = currentTime;
-  
   }
   
-} // end changeRedLevel
-
-
-/**
- * This method determines the animation used for the white, "calm" LED.
- */
-void changeWhiteLevel() {
-
-  long currentTime = millis();
-
-  // Change whitePeriod to make the pulse faster/slower.
-  if(currentTime - oldWhiteTime > whitePeriod) {
-
-    // This animation is a simple pulse that dims and brightens.
-    if(dimming) {
-
-      analogWrite(WHITE_PIN, --whiteLevel);
-    
-    }  else {
-
-      analogWrite(WHITE_PIN, ++whiteLevel);
-      
-    }
-
-    if(whiteLevel >= maxWhiteLevel || whiteLevel <= minWhiteLevel) {
-
-      dimming = !dimming;
-      
-    }
-
-    oldWhiteTime = currentTime;
-  
-  }
-  
-} // end changeWhiteLevels
+} // end updateColorValues
 
 
 /**
@@ -153,26 +99,8 @@ void moodButtonISR() {
 
       // The button is used to change modes.
       isAngry = !isAngry;
-
-      // Init starting values for each state (starting on the high end).
-      if(isAngry) {
-
-        redLevel = maxRedLevel;
-        analogWrite(RED_PIN, redLevel);
-        analogWrite(WHITE_PIN, 0);
     
-      } else {
-
-        whiteLevel = maxWhiteLevel;
-        analogWrite(RED_PIN, 0);
-        analogWrite(WHITE_PIN, whiteLevel);
-    
-      }
-
-      // Since we're starting high, we should be dimming.
-      dimming = true;
-    
-  }
+    }
   
 } // end moodButtonISR
 
