@@ -25,9 +25,9 @@ volatile boolean isAngry = false; // Keep volatile (modified by ISR).
 volatile boolean moodChanged = false; // Keep volatile (modified by ISR).
 
 // Illumination values for individual colors, 0 = off, 255 = max.
-int red = 50;
-int green = 50;
-int blue = 75;
+int red = 115;
+int green = 115;
+int blue = 115;
 
 // Timing variables for eye animations.
 long lastAngryTime = 0;
@@ -85,11 +85,7 @@ boolean updateColorValues() {
 
   if(isAngry) {
 
-    red = 200;
-    green = 25;
-    blue = 0;
-
-    return true;
+    return updateAngryColors();
       
   } else {
 
@@ -101,36 +97,35 @@ boolean updateColorValues() {
 
 
 /**
- * This method is used to update colors while in the passive state.
+ * This method is used to update colors while in the angry state.
  */
-boolean updatePassiveColors() {
+boolean updateAngryColors() {
 
-  const int midRed = 115;
-  const int midGreen = 115;
-  const int midBlue = 115;
-  const int colorRange = 50;
-  const int overload = 255 - midRed;
-  const long passiveFlashingPeriod = 4;
-  const long passiveCoolDownPeriod = 6;
-  const long passiveStandardPeriod = 50;
+  // Constants specific to the passive state.
+  const int midRed = 225;
+  const int midGreen = 20;
+  const int midBlue = 0;
+  const int colorRange = 25; // Will pulse this far above/below mid levels.
+  const int overload = 255 - midRed; // Overload will be max red;
+  const long angryFlashingPeriod = 5; // Dictates speed of the flash.
+  const long angryCoolDownPeriod = 4; // Dictates speed of the cool down.
+  const long angryStandardPeriod = 10; // Dictates normal pulse speed.
 
-  // Specific to this animation cycle but need to stick around.
-  static long previousPassiveTime = 0;
+  // Triggers specific to this animation cycle, need to stick around.
   static boolean eyesOverloading = false;
   static boolean eyesCoolingDown = false;
   static boolean dimming = false;
 
+  // Return value, must be updated if values are changed.
   boolean valuesChanged = false;
   
-  long currentTime = millis();
-
   /* This outer IF-Else block work kind of like Keyframes or "phases".
    * Phase 1: Reset the eyes to desired shade.
    * Phase 2: Overflash like Goa'uld eyes.
    * Phase 3: Settle back to normal high levels.
-   * Phase 4: Standard slow pulse.
+   * Phase 4: Standard creepy faster pulse.
    */
-  if(moodChanged) { // Phase 1 (based on ISR).
+  if(moodChanged) { // Phase 1.
 
     red = midRed;
     green = midGreen;
@@ -143,14 +138,9 @@ boolean updatePassiveColors() {
   } else if(eyesOverloading) { // Phase 2.
 
     // Control animation speed without blocking.
-    if(currentTime - previousPassiveTime >= passiveFlashingPeriod) {
-
+    if(valuesChanged = hasEnoughTimePassed(angryFlashingPeriod)) {
+      
       red++;
-      green++;
-      blue++;
-
-      previousPassiveTime = currentTime;
-      valuesChanged = true;
       
     }
 
@@ -165,14 +155,9 @@ boolean updatePassiveColors() {
   } else if(eyesCoolingDown) { // Phase 3.
 
     // Control animation speed without blocking.
-    if(currentTime - previousPassiveTime >= passiveCoolDownPeriod) {
+    if(valuesChanged = hasEnoughTimePassed(angryCoolDownPeriod)) {
 
       red--;
-      green--;
-      blue--;
-
-      previousPassiveTime = currentTime;
-      valuesChanged = true;
       
     }
 
@@ -180,43 +165,30 @@ boolean updatePassiveColors() {
     if(red == midRed) {
 
       eyesCoolingDown = false; // Trigger the next phase.
-      dimming = false;
+      dimming = false; // false to pulse up first.
       
     }
 
   } else { // Phase 4.
 
     // Standard animation after initial flash occured.
-    if(currentTime - previousPassiveTime >= passiveStandardPeriod) {
+    if(valuesChanged = hasEnoughTimePassed(angryStandardPeriod)) {
       
       if(dimming) {
 
         red--;
-        green--;
-        blue--;
-
-        if(red <= midRed - colorRange) {
-
-          dimming = false;
-          
-        }
         
       } else {
 
         red++;
-        green++;
-        blue++;
-
-        if(red >= midRed + colorRange) {
-
-          dimming = true;
-          
-        }
         
       }
 
-      previousPassiveTime = currentTime;
-      valuesChanged = true;
+      if(red == midRed + colorRange || red == midRed - colorRange) {
+
+          dimming = !dimming;
+          
+      }
       
     }
     
@@ -224,7 +196,163 @@ boolean updatePassiveColors() {
 
   return valuesChanged;
   
-} // end animatePassive
+} // end updateAngryColors
+
+
+/**
+ * This method is used to update colors while in the passive state.
+ */
+boolean updatePassiveColors() {
+
+  // Constants specific to the passive state.
+  const int resetRed = 25;
+  const int resetGreen = 25;
+  const int resetBlue = 25;
+  const int midRed = 135;
+  const int midGreen = 135;
+  const int midBlue = 135;
+  const int colorRange = 50; // Will pulse this far above/below mid levels.
+  const int overload = 255 - midRed; // Overload will be max bright;
+  const long passiveFlashingPeriod = 5; // Dictates speed of the flash.
+  const long passiveCoolDownPeriod = 4; // Dictates speed of the cool down.
+  const long passiveStandardPeriod = 50; // Dictates normal pulse speed.
+
+  // Triggers specific to this animation cycle, need to stick around.
+  static boolean eyesOverloading = false;
+  static boolean eyesCoolingDown = false;
+  static boolean dimming = false;
+
+  // Return value, must be updated if values are changed.
+  boolean valuesChanged = false;
+  
+  /* This outer IF-Else block work kind of like Keyframes or "phases".
+   * Phase 1: Reset the eyes to desired shade.
+   * Phase 2: Overflash like Goa'uld eyes.
+   * Phase 3: Settle back to normal high levels.
+   * Phase 4: Standard slow pulse.
+   */
+  if(moodChanged) { // Phase 1.
+
+    red = resetRed;
+    green = resetGreen;
+    blue = resetBlue;
+    
+    eyesOverloading = true; // Trigger the next phase.
+    moodChanged = false; // Acknowledge the ISR did it's thing.
+    valuesChanged = true;
+    
+  } else if(eyesOverloading) { // Phase 2.
+
+    // Control animation speed without blocking.
+    if(valuesChanged = hasEnoughTimePassed(passiveFlashingPeriod)) {
+      
+      incrementPassiveColors();
+      
+    }
+
+    // Once settled, move to standard animation.
+    if(red == midRed + overload) {
+
+      eyesOverloading = false; // Trigger the next phase.
+      eyesCoolingDown = true;
+      
+    }
+
+  } else if(eyesCoolingDown) { // Phase 3.
+
+    // Control animation speed without blocking.
+    if(valuesChanged = hasEnoughTimePassed(passiveCoolDownPeriod)) {
+
+      decrementPassiveColors();
+      
+    }
+
+    // Once settled, move to standard animation.
+    if(red == midRed) {
+
+      eyesCoolingDown = false; // Trigger the next phase.
+      dimming = false; // false to pulse up first.
+      
+    }
+
+  } else { // Phase 4.
+
+    // Standard animation after initial flash occured.
+    if(valuesChanged = hasEnoughTimePassed(passiveStandardPeriod)) {
+      
+      if(dimming) {
+
+        decrementPassiveColors();
+        
+      } else {
+
+        incrementPassiveColors();
+        
+      }
+
+      if(red == midRed + colorRange || red == midRed - colorRange) {
+
+          dimming = !dimming;
+          
+      }
+      
+    }
+    
+  }
+
+  return valuesChanged;
+  
+} // end updatePassiveColors
+
+
+/**
+ * This method is used to time the eye animations in which we don't want changes to 
+ * occure as fast as possible but only after certain intervals.
+ * 
+ * @return - A boolean true if the provided period has been met since the last update, 
+ * false otherwise.
+ */
+boolean hasEnoughTimePassed(long period) {
+
+  static long previousTime = 0;
+  long currentTime = millis();
+
+  if(currentTime - previousTime >= period) {
+
+    previousTime = currentTime;
+    return true;
+    
+  } else {
+
+    return false;
+    
+  }
+  
+} // end hasEnoughTimePassed
+
+
+/**
+ * This method is used to increment the colors while in the passive state.
+ */
+void incrementPassiveColors() {
+
+  red++;
+  green++;
+  blue++;
+  
+} // end incrementPassiveColors
+
+
+/**
+ * This method is used to decrement the colors while in the passive state.
+ */
+void decrementPassiveColors() {
+
+  red--;
+  green--;
+  blue--;
+  
+} // end decrementPassiveColors
 
 
 /**
@@ -237,8 +365,8 @@ void moodButtonISR() {
     if(wasButtonPressed()) {
 
       // The button is used to change modes.
-      isAngry = !isAngry;
-      moodChanged = true;
+      isAngry = !isAngry; // Toggles the mode.
+      moodChanged = true; // Flag for outside methods to do something.
     
     } 
   
