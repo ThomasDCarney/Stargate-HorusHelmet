@@ -41,7 +41,7 @@ void setup() {
 
   // Initialize buttons.
   pinMode(BUTTON_PIN, INPUT);
-  attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), moodButtonISR, RISING);
+  attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), moodButtonISR, FALLING);
 
   // Init the NeoPixel strip.
   strip.begin();
@@ -408,43 +408,11 @@ void decrementPassiveColors() {
 
 /**
  * Interrupt Service Request for switching between angry/calm mood/mode. This
- * ISR will be called whenever the pins state goes HIGH.
+ * ISR will be called whenever the pins state goes LOW.
  */
 void moodButtonISR() {
 
-    /* Since we're using software debouncing, wasButtonPressed() will tell the
-     * ISR whether or not to do its thing or ignore due to bounce.
-     */
-    if(wasButtonPressed()) {
-
-      // The button is used to change modes.
+      // The button is used to trigger a mood/mode change.
       moodChanged = true; // Flag for outside methods to do something.
 
-    }
-
 } // end moodButtonISR
-
-
-/**
- * A debounce routine used for the mood switch.
- */
-boolean wasButtonPressed() {
-
-  const int DEBOUNCE_LENGTH = 250; // Tweak for the specific switch used.
-  static long oldDebounceTime = 0;
-  long currentTime = millis();
-
-  // Only register the initial button press, assume the bounces die off after
-  // a certain period... tweak DEBOUNCE_LENGTH if needed.
-  if(currentTime - oldDebounceTime >= DEBOUNCE_LENGTH){
-
-      // Record the button was pressed and when.
-      oldDebounceTime = currentTime;
-      return true;
-
-
-  }
-
-  return false;
-
-} // end wasButtonPressed
