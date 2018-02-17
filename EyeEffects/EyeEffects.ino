@@ -1,10 +1,10 @@
-/* Horus will have two "moods" or modes, illustrated by the color of the eyes. 
- * This is handled by two LED's, white for normal running and red for angry or 
- * attack mode.  
+/* Horus will have two "moods" or modes, illustrated by the color of the eyes.
+ * This is handled by two LED's, white for normal running and red for angry or
+ * attack mode.
  *
- * Changing moods/modes is handled via an ISR and each has a unique set of 
+ * Changing moods/modes is handled via an ISR and each has a unique set of
  * values to control their animations.
- * 
+ *
  * Debouncing is handled in software.
  */
 
@@ -16,12 +16,9 @@ const int BUTTON_PIN = 2;
 const int DATA_PIN = 6; // Sends instructions to "Data In" on strip.
 const int NUM_PIXELS = 2; // number of pixels in the strip.
 
-// For software debounce (momentary switch). 
-const int DEBOUNCE_LENGTH = 250; // Tweak for the specific switch used.
-volatile long oldDebounceTime = 0; // Keep volatile (modified by ISR)
-
 // Keeps track of mood/mode (angry or passive).
-volatile boolean isAngry = false; // Keep volatile (modified by ISR).
+boolean isAngry = false;
+boolean resetMood = false;
 volatile boolean moodChanged = false; // Keep volatile (modified by ISR).
 
 // Illumination values for individual colors, 0 = off, 255 = max.
@@ -29,12 +26,7 @@ int red = 100;
 int green = 100;
 int blue = 100;
 
-// Timing variables for eye animations.
-long lastAngryTime = 0;
-int angrySettlingPeriod = 50;
-int angryStandardPeriod = 100;
-
-/* The NeoPixel Strip object is used to represent/control the pixels. 
+/* The NeoPixel Strip object is used to represent/control the pixels.
  * Parameter 1 = Number of pixels in the strip.
  * Parameter 2 = Pin used for data input.
  * Parameter 3 = Pixel type flags... see documentation!
@@ -43,66 +35,76 @@ Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_PIXELS, DATA_PIN, NEO_GRB);
 
 
 /**
- * Initial one-time setup.
+ * Initial setup.
  */
 void setup() {
 
-  // Init the button.
+  // Initialize buttons.
   pinMode(BUTTON_PIN, INPUT);
-  attachInterrupt(digitalPinToInterrupt(2), moodButtonISR, RISING);
+  attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), moodButtonISR, RISING);
 
-  // Init the pixel strip.
+  // Init the NeoPixel strip.
   strip.begin();
-
   for(int i = 0; i < NUM_PIXELS; i++) {
 
     strip.setPixelColor(i, red, green, blue);
-    strip.show(); // no values specified yet so inits all pixels to off.
-    
+    strip.show();
+
   }
-  
 
 } // end setup
 
 
 /**
- * Main loop, all it does is tells a particular LED (depending on mood) to move along 
- * in it's animation. 
+ * Main loop.
  */
 void loop() {
 
+  // Acknowledge the mood button ISR (button was pressed).
+  if(moodChanged) {
+
+      resetMood = true;
+      isAngry = !isAngry;
+      moodChanged = false; // Reset button notification!
+
+  }
+
+  /* We are asking the program to update color values which returns a boolean
+   * true if values were changed (false otherwise). If no changes occured then
+   * we won't waste time pushing the same values to our pixels.
+   */
   if(updateColorValues()) {
 
     for(int i = 0; i < NUM_PIXELS; i++) {
 
       strip.setPixelColor(i, red, green, blue);
       strip.show();
-      
+
     }
-    
+
   }
-  
-  
+
 } // end loop
 
 
 /**
- * This method will handle updating pixel colors.
- * 
- * @return - A boolean true if colors were updated, false otherwise.
+ * This method handles updating each pixels color values based on the current
+ * mood/mode (angry or passive).
+ *
+ * @return - A boolean true if colors were updated/changed, false otherwise.
  */
 boolean updateColorValues() {
 
   if(isAngry) {
 
     return updateAngryColors();
-      
+
   } else {
 
     return updatePassiveColors();
-    
+
   }
-  
+
 } // end updateColorValues
 
 
@@ -115,11 +117,11 @@ boolean updateAngryColors() {
   const int midRed = 150;
   const int colorRange = 80; // Will pulse this far above/below mid levels.
   const int overload = 255; // Overload will be max red;
-  
+
   // Timing variables for each phase.
   const long phase2Period = 6;
   const long phase3Period = 10;
-  const long phase4Period = 6; 
+  const long phase4Period = 6;
   const long phase5Period = 1;
 
   // Booleans to control phases of the animation.
@@ -130,7 +132,7 @@ boolean updateAngryColors() {
 
   // Return value, must be updated if values are changed.
   boolean valuesChanged = false;
-  
+
   /* This outer IF-Else block work kind of like Keyframes or "phases".
    * Phase 1: Reset the eyes to desired shade.
    * Phase 2: Raise to the normal maximum brightness.
@@ -138,23 +140,23 @@ boolean updateAngryColors() {
    * Phase 4: Dim to normal mid brightness.
    * Phase 5: Normal fast pulse.
    */
-  if(moodChanged) {
+  if(resetMood) {
 
     red = 25;
     green = 15;
     blue = 0;
-    
+
     phase2 = true; // Trigger the next phase.
-    moodChanged = false; // Acknowledge the ISR did it's thing.
+    resetMood = false;
     valuesChanged = true;
-    
+
   } else if(phase2) {
 
     // Control animation speed without blocking.
     if(valuesChanged = hasEnoughTimePassed(phase2Period)) {
-      
+
       red++;
-      
+
     }
 
     // Once settled, move to standard animation.
@@ -162,7 +164,7 @@ boolean updateAngryColors() {
 
       phase2 = false; // Trigger the next phase.
       phase3 = true;
-      
+
     }
 
   } else if(phase3) {
@@ -171,14 +173,14 @@ boolean updateAngryColors() {
     if(valuesChanged = hasEnoughTimePassed(phase3Period)) {
 
       red++;
-      
+
     }
 
     if(red == overload) {
 
-      phase3 = false; 
+      phase3 = false;
       phase4 = true; // Trigger the next phase.
-      
+
     }
 
   } else if(phase4) {
@@ -187,44 +189,44 @@ boolean updateAngryColors() {
     if(valuesChanged = hasEnoughTimePassed(phase4Period)) {
 
       red--;
-      
+
     }
 
     if(red == midRed) {
 
-      phase4 = false; 
+      phase4 = false;
       dimming = false;
-      
+
     }
 
-    
+
   } else {
 
     // Standard animation after initial flash occured.
     if(valuesChanged = hasEnoughTimePassed(phase5Period)) {
-      
+
       if(dimming) {
 
         red--;
-        
+
       } else {
 
         red++;
-        
+
       }
 
       if(red >= midRed + colorRange || red <= midRed - colorRange) {
 
           dimming = !dimming;
-          
+
       }
-      
+
     }
-    
+
   }
 
   return valuesChanged;
-  
+
 } // end updateAngryColors
 
 
@@ -239,7 +241,7 @@ boolean updatePassiveColors() {
   const int midBlue = 100;
 
   // Values will pulse above/below mid levels by this much.
-  const int colorRange = 75; // 
+  const int colorRange = 75; //
 
   // Dramatic effect max value for this animation.
   const int overloadRed = 255; // Overload will be max bright;
@@ -247,7 +249,7 @@ boolean updatePassiveColors() {
   // Timing variables for each phase.
   const long phase2Period = 3;
   const long phase3Period = 10;
-  const long phase4Period = 5; 
+  const long phase4Period = 5;
   const long phase5Period = 25;
 
   // Booleans to control phases of the animation.
@@ -258,7 +260,7 @@ boolean updatePassiveColors() {
 
   // Return value, update if values actually change.
   boolean valuesChanged = false;
-  
+
   /* This outer IF-Else block work kind of like Keyframes or "phases".
    * Phase 1: Reset the eyes to desired shade.
    * Phase 2: Eyes go to normal max.
@@ -266,23 +268,23 @@ boolean updatePassiveColors() {
    * Phase 4: Eyes recover from overload, dimming to normal max.
    * Phase 5: Normal slow pulse until some change occures.
    */
-  if(moodChanged) {
+  if(resetMood) {
 
     red = 25;
     green = 25;
     blue = 25;
 
-    moodChanged = false; // End phase 1, ISR did it's thing.
+    resetMood = false;
     phase2 = true; // Trigger the next phase.
     valuesChanged = true;
-    
+
   } else if(phase2) {
 
     // Control animation speed without blocking.
     if(valuesChanged = hasEnoughTimePassed(phase2Period)) {
-      
+
       incrementPassiveColors();
-      
+
     }
 
     // Once settled, move to standard animation.
@@ -290,7 +292,7 @@ boolean updatePassiveColors() {
 
       phase2 = false; // This phase is over.
       phase3 = true; // Next phase begins.
-      
+
     }
 
   } else if(phase3) {
@@ -299,7 +301,7 @@ boolean updatePassiveColors() {
     if(valuesChanged = hasEnoughTimePassed(phase3Period)) {
 
       incrementPassiveColors();
-      
+
     }
 
     // Once the eyes have reached max brightness.
@@ -307,7 +309,7 @@ boolean updatePassiveColors() {
 
       phase3 = false; // This phase is over.
       phase4 = true; // Next phase begins.
-      
+
     }
 
   } else if(phase4) {
@@ -315,7 +317,7 @@ boolean updatePassiveColors() {
     if(valuesChanged = hasEnoughTimePassed(phase4Period)) {
 
       decrementPassiveColors();
-      
+
     }
 
     // Once the overload is totally over.
@@ -323,46 +325,45 @@ boolean updatePassiveColors() {
 
       phase4 = false; // This phase is over.
       dimming = true;
-      
+
     }
-    
-    
+
+
   } else {
 
     // Standard animation after initial flash occured.
     if(valuesChanged = hasEnoughTimePassed(phase5Period)) {
-      
+
       if(dimming) {
 
         decrementPassiveColors();
-        
+
       } else {
 
         incrementPassiveColors();
-        
+
       }
 
       if(red >= midRed + colorRange || red <= midRed - colorRange) {
 
           dimming = !dimming;
-          
+
       }
-      
+
     }
-    
+
   }
 
   return valuesChanged;
-  
+
 } // end updatePassiveColors
 
 
 /**
- * This method is used to time the eye animations in which we don't want changes to 
- * occure as fast as possible but only after certain intervals.
- * 
- * @return - A boolean true if the provided period has been met since the last update, 
- * false otherwise.
+ * This method is used to time the animations where we only want changes to
+ * occure if the specified time has elapsed since the last change.
+ *
+ * @return - A boolean true if the provided period has expired, false otherwise.
  */
 boolean hasEnoughTimePassed(long period) {
 
@@ -373,13 +374,11 @@ boolean hasEnoughTimePassed(long period) {
 
     previousTime = currentTime;
     return true;
-    
-  } else {
 
-    return false;
-    
   }
-  
+
+  return false;
+
 } // end hasEnoughTimePassed
 
 
@@ -391,7 +390,7 @@ void incrementPassiveColors() {
   red++;
   green++;
   blue++;
-  
+
 } // end incrementPassiveColors
 
 
@@ -403,25 +402,26 @@ void decrementPassiveColors() {
   red--;
   green--;
   blue--;
-  
+
 } // end decrementPassiveColors
 
 
 /**
- * Interrupt Service Request for switching between angry/calm mood/mode
+ * Interrupt Service Request for switching between angry/calm mood/mode. This
+ * ISR will be called whenever the pins state goes HIGH.
  */
 void moodButtonISR() {
 
-    // Since we're using software debouncing, wasButtonPressed() will tell the ISR whether 
-    // or not to perform its routine.
+    /* Since we're using software debouncing, wasButtonPressed() will tell the
+     * ISR whether or not to do its thing or ignore due to bounce.
+     */
     if(wasButtonPressed()) {
 
       // The button is used to change modes.
-      isAngry = !isAngry; // Toggles the mode.
       moodChanged = true; // Flag for outside methods to do something.
-    
-    } 
-  
+
+    }
+
 } // end moodButtonISR
 
 
@@ -430,24 +430,21 @@ void moodButtonISR() {
  */
 boolean wasButtonPressed() {
 
+  const int DEBOUNCE_LENGTH = 250; // Tweak for the specific switch used.
+  static long oldDebounceTime = 0;
   long currentTime = millis();
-  boolean buttonPressed = false;
 
   // Only register the initial button press, assume the bounces die off after
   // a certain period... tweak DEBOUNCE_LENGTH if needed.
-  if(currentTime - oldDebounceTime > DEBOUNCE_LENGTH){
-    
-    if(digitalRead(BUTTON_PIN) == HIGH) {
+  if(currentTime - oldDebounceTime >= DEBOUNCE_LENGTH){
 
       // Record the button was pressed and when.
-      buttonPressed = true;
       oldDebounceTime = currentTime;
-  
-    }
-  
-  }
-  
-  return buttonPressed;
-  
-} // end wasButtonPressed
+      return true;
 
+
+  }
+
+  return false;
+
+} // end wasButtonPressed
