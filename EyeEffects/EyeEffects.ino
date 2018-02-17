@@ -14,7 +14,7 @@
 // Define which pins are used.
 const int BUTTON_PIN = 2;
 const int DATA_PIN = 6; // Sends instructions to "Data In" on strip.
-const int NUM_PIXELS = 1; // number of pixels in the strip.
+const int NUM_PIXELS = 2; // number of pixels in the strip.
 
 // For software debounce (momentary switch). 
 const int DEBOUNCE_LENGTH = 250; // Tweak for the specific switch used.
@@ -25,9 +25,9 @@ volatile boolean isAngry = false; // Keep volatile (modified by ISR).
 volatile boolean moodChanged = false; // Keep volatile (modified by ISR).
 
 // Illumination values for individual colors, 0 = off, 255 = max.
-int red = 115;
-int green = 115;
-int blue = 115;
+int red = 100;
+int green = 100;
+int blue = 100;
 
 // Timing variables for eye animations.
 long lastAngryTime = 0;
@@ -53,8 +53,14 @@ void setup() {
 
   // Init the pixel strip.
   strip.begin();
-  strip.setPixelColor(0, red, green, blue);
-  strip.show(); // no values specified yet so inits all pixels to off.
+
+  for(int i = 0; i < NUM_PIXELS; i++) {
+
+    strip.setPixelColor(i, red, green, blue);
+    strip.show(); // no values specified yet so inits all pixels to off.
+    
+  }
+  
 
 } // end setup
 
@@ -67,9 +73,13 @@ void loop() {
 
   if(updateColorValues()) {
 
-    strip.setPixelColor(0, red, green, blue);
-    strip.show();
-  
+    for(int i = 0; i < NUM_PIXELS; i++) {
+
+      strip.setPixelColor(i, red, green, blue);
+      strip.show();
+      
+    }
+    
   }
   
   
@@ -102,77 +112,96 @@ boolean updateColorValues() {
 boolean updateAngryColors() {
 
   // Constants specific to the passive state.
-  const int midRed = 225;
-  const int midGreen = 20;
-  const int midBlue = 0;
-  const int colorRange = 25; // Will pulse this far above/below mid levels.
-  const int overload = 255 - midRed; // Overload will be max red;
-  const long angryFlashingPeriod = 5; // Dictates speed of the flash.
-  const long angryCoolDownPeriod = 4; // Dictates speed of the cool down.
-  const long angryStandardPeriod = 10; // Dictates normal pulse speed.
+  const int midRed = 150;
+  const int colorRange = 80; // Will pulse this far above/below mid levels.
+  const int overload = 255; // Overload will be max red;
+  
+  // Timing variables for each phase.
+  const long phase2Period = 6;
+  const long phase3Period = 10;
+  const long phase4Period = 6; 
+  const long phase5Period = 1;
 
-  // Triggers specific to this animation cycle, need to stick around.
-  static boolean eyesOverloading = false;
-  static boolean eyesCoolingDown = false;
-  static boolean dimming = false;
+  // Booleans to control phases of the animation.
+  static boolean phase2 = false;
+  static boolean phase3 = false;
+  static boolean phase4 = false;
+  static boolean dimming = true;
 
   // Return value, must be updated if values are changed.
   boolean valuesChanged = false;
   
   /* This outer IF-Else block work kind of like Keyframes or "phases".
    * Phase 1: Reset the eyes to desired shade.
-   * Phase 2: Overflash like Goa'uld eyes.
-   * Phase 3: Settle back to normal high levels.
-   * Phase 4: Standard creepy faster pulse.
+   * Phase 2: Raise to the normal maximum brightness.
+   * Phase 3: Overload the eyes a bit.
+   * Phase 4: Dim to normal mid brightness.
+   * Phase 5: Normal fast pulse.
    */
-  if(moodChanged) { // Phase 1.
+  if(moodChanged) {
 
-    red = midRed;
-    green = midGreen;
-    blue = midBlue;
+    red = 25;
+    green = 15;
+    blue = 0;
     
-    eyesOverloading = true; // Trigger the next phase.
+    phase2 = true; // Trigger the next phase.
     moodChanged = false; // Acknowledge the ISR did it's thing.
     valuesChanged = true;
     
-  } else if(eyesOverloading) { // Phase 2.
+  } else if(phase2) {
 
     // Control animation speed without blocking.
-    if(valuesChanged = hasEnoughTimePassed(angryFlashingPeriod)) {
+    if(valuesChanged = hasEnoughTimePassed(phase2Period)) {
       
       red++;
       
     }
 
     // Once settled, move to standard animation.
-    if(red == midRed + overload) {
+    if(red == midRed + colorRange) {
 
-      eyesOverloading = false; // Trigger the next phase.
-      eyesCoolingDown = true;
+      phase2 = false; // Trigger the next phase.
+      phase3 = true;
       
     }
 
-  } else if(eyesCoolingDown) { // Phase 3.
+  } else if(phase3) {
 
     // Control animation speed without blocking.
-    if(valuesChanged = hasEnoughTimePassed(angryCoolDownPeriod)) {
+    if(valuesChanged = hasEnoughTimePassed(phase3Period)) {
+
+      red++;
+      
+    }
+
+    if(red == overload) {
+
+      phase3 = false; 
+      phase4 = true; // Trigger the next phase.
+      
+    }
+
+  } else if(phase4) {
+
+    // Control animation speed without blocking.
+    if(valuesChanged = hasEnoughTimePassed(phase4Period)) {
 
       red--;
       
     }
 
-    // Once settled, move to standard animation.
     if(red == midRed) {
 
-      eyesCoolingDown = false; // Trigger the next phase.
-      dimming = false; // false to pulse up first.
+      phase4 = false; 
+      dimming = false;
       
     }
 
-  } else { // Phase 4.
+    
+  } else {
 
     // Standard animation after initial flash occured.
-    if(valuesChanged = hasEnoughTimePassed(angryStandardPeriod)) {
+    if(valuesChanged = hasEnoughTimePassed(phase5Period)) {
       
       if(dimming) {
 
@@ -184,7 +213,7 @@ boolean updateAngryColors() {
         
       }
 
-      if(red == midRed + colorRange || red == midRed - colorRange) {
+      if(red >= midRed + colorRange || red <= midRed - colorRange) {
 
           dimming = !dimming;
           
@@ -204,81 +233,104 @@ boolean updateAngryColors() {
  */
 boolean updatePassiveColors() {
 
-  // Constants specific to the passive state.
-  const int resetRed = 25;
-  const int resetGreen = 25;
-  const int resetBlue = 25;
-  const int midRed = 135;
-  const int midGreen = 135;
-  const int midBlue = 135;
-  const int colorRange = 50; // Will pulse this far above/below mid levels.
-  const int overload = 255 - midRed; // Overload will be max bright;
-  const long passiveFlashingPeriod = 5; // Dictates speed of the flash.
-  const long passiveCoolDownPeriod = 4; // Dictates speed of the cool down.
-  const long passiveStandardPeriod = 50; // Dictates normal pulse speed.
+  // Middle of level variation when passive mode progresses
+  const int midRed = 100;
+  const int midGreen = 100;
+  const int midBlue = 100;
 
-  // Triggers specific to this animation cycle, need to stick around.
-  static boolean eyesOverloading = false;
-  static boolean eyesCoolingDown = false;
-  static boolean dimming = false;
+  // Values will pulse above/below mid levels by this much.
+  const int colorRange = 75; // 
 
-  // Return value, must be updated if values are changed.
+  // Dramatic effect max value for this animation.
+  const int overloadRed = 255; // Overload will be max bright;
+
+  // Timing variables for each phase.
+  const long phase2Period = 3;
+  const long phase3Period = 10;
+  const long phase4Period = 5; 
+  const long phase5Period = 25;
+
+  // Booleans to control phases of the animation.
+  static boolean phase2 = false;
+  static boolean phase3 = false;
+  static boolean phase4 = false;
+  static boolean dimming = true;
+
+  // Return value, update if values actually change.
   boolean valuesChanged = false;
   
   /* This outer IF-Else block work kind of like Keyframes or "phases".
    * Phase 1: Reset the eyes to desired shade.
-   * Phase 2: Overflash like Goa'uld eyes.
-   * Phase 3: Settle back to normal high levels.
-   * Phase 4: Standard slow pulse.
+   * Phase 2: Eyes go to normal max.
+   * Phase 3: Eyes overload, goa'uld style.
+   * Phase 4: Eyes recover from overload, dimming to normal max.
+   * Phase 5: Normal slow pulse until some change occures.
    */
-  if(moodChanged) { // Phase 1.
+  if(moodChanged) {
 
-    red = resetRed;
-    green = resetGreen;
-    blue = resetBlue;
-    
-    eyesOverloading = true; // Trigger the next phase.
-    moodChanged = false; // Acknowledge the ISR did it's thing.
+    red = 25;
+    green = 25;
+    blue = 25;
+
+    moodChanged = false; // End phase 1, ISR did it's thing.
+    phase2 = true; // Trigger the next phase.
     valuesChanged = true;
     
-  } else if(eyesOverloading) { // Phase 2.
+  } else if(phase2) {
 
     // Control animation speed without blocking.
-    if(valuesChanged = hasEnoughTimePassed(passiveFlashingPeriod)) {
+    if(valuesChanged = hasEnoughTimePassed(phase2Period)) {
       
       incrementPassiveColors();
       
     }
 
     // Once settled, move to standard animation.
-    if(red == midRed + overload) {
+    if(red == midRed + colorRange) {
 
-      eyesOverloading = false; // Trigger the next phase.
-      eyesCoolingDown = true;
+      phase2 = false; // This phase is over.
+      phase3 = true; // Next phase begins.
       
     }
 
-  } else if(eyesCoolingDown) { // Phase 3.
+  } else if(phase3) {
 
     // Control animation speed without blocking.
-    if(valuesChanged = hasEnoughTimePassed(passiveCoolDownPeriod)) {
+    if(valuesChanged = hasEnoughTimePassed(phase3Period)) {
+
+      incrementPassiveColors();
+      
+    }
+
+    // Once the eyes have reached max brightness.
+    if(red >= overloadRed) {
+
+      phase3 = false; // This phase is over.
+      phase4 = true; // Next phase begins.
+      
+    }
+
+  } else if(phase4) {
+
+    if(valuesChanged = hasEnoughTimePassed(phase4Period)) {
 
       decrementPassiveColors();
       
     }
 
-    // Once settled, move to standard animation.
-    if(red == midRed) {
+    // Once the overload is totally over.
+    if(red <= midRed + colorRange) {
 
-      eyesCoolingDown = false; // Trigger the next phase.
-      dimming = false; // false to pulse up first.
+      phase4 = false; // This phase is over.
+      dimming = true;
       
     }
-
-  } else { // Phase 4.
+    
+    
+  } else {
 
     // Standard animation after initial flash occured.
-    if(valuesChanged = hasEnoughTimePassed(passiveStandardPeriod)) {
+    if(valuesChanged = hasEnoughTimePassed(phase5Period)) {
       
       if(dimming) {
 
@@ -290,7 +342,7 @@ boolean updatePassiveColors() {
         
       }
 
-      if(red == midRed + colorRange || red == midRed - colorRange) {
+      if(red >= midRed + colorRange || red <= midRed - colorRange) {
 
           dimming = !dimming;
           
