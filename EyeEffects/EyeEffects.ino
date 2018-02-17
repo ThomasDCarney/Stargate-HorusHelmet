@@ -113,22 +113,17 @@ boolean updateColorValues() {
  */
 boolean updateAngryColors() {
 
-  // Constants specific to the passive state.
-  const int midRed = 150;
-  const int colorRange = 80; // Will pulse this far above/below mid levels.
-  const int overload = 255; // Overload will be max red;
+  // Constants specific to the angry state.
+  const int midRed = 100;
+  const int overload = 100; // Will pulse this far above mid levels.
 
   // Timing variables for each phase.
-  const long phase2Period = 6;
-  const long phase3Period = 10;
-  const long phase4Period = 6;
-  const long phase5Period = 1;
+  const long phase2Period = 10;
+  const long phase3Period = 7;
 
   // Booleans to control phases of the animation.
   static boolean phase2 = false;
   static boolean phase3 = false;
-  static boolean phase4 = false;
-  static boolean dimming = true;
 
   // Return value, must be updated if values are changed.
   boolean valuesChanged = false;
@@ -143,7 +138,7 @@ boolean updateAngryColors() {
   if(resetMood) {
 
     red = 25;
-    green = 15;
+    green = 0;
     blue = 0;
 
     phase2 = true; // Trigger the next phase.
@@ -160,7 +155,7 @@ boolean updateAngryColors() {
     }
 
     // Once settled, move to standard animation.
-    if(red == midRed + colorRange) {
+    if(red == midRed + overload) {
 
       phase2 = false; // Trigger the next phase.
       phase3 = true;
@@ -172,54 +167,13 @@ boolean updateAngryColors() {
     // Control animation speed without blocking.
     if(valuesChanged = hasEnoughTimePassed(phase3Period)) {
 
-      red++;
-
-    }
-
-    if(red == overload) {
-
-      phase3 = false;
-      phase4 = true; // Trigger the next phase.
-
-    }
-
-  } else if(phase4) {
-
-    // Control animation speed without blocking.
-    if(valuesChanged = hasEnoughTimePassed(phase4Period)) {
-
       red--;
 
     }
 
     if(red == midRed) {
 
-      phase4 = false;
-      dimming = false;
-
-    }
-
-
-  } else {
-
-    // Standard animation after initial flash occured.
-    if(valuesChanged = hasEnoughTimePassed(phase5Period)) {
-
-      if(dimming) {
-
-        red--;
-
-      } else {
-
-        red++;
-
-      }
-
-      if(red >= midRed + colorRange || red <= midRed - colorRange) {
-
-          dimming = !dimming;
-
-      }
+      phase3 = false;
 
     }
 
